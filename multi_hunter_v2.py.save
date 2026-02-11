@@ -1,9 +1,7 @@
-
 import os, requests, time, subprocess, xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 from datetime import datetime
-import requests, random, time
-import os, json, time, random, psutil, sqlite3
+import requests,json, random, time
 
 load_dotenv('/root/agent_system/.env')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -11,19 +9,16 @@ NEYNAR_API_KEY = os.getenv("NEYNAR_API_KEY")
 SIGNER_UUID = os.getenv("SIGNER_UUID")
 DISCORD_URL = "https://discord.com/api/webhooks/1469793300075512090/dCdj2wFQuDrw597CmZ_nTcSzlleVxTL6zHkzYhXYfia3oneI0Ua0mrfxI0y5K7v14bUW"
 GITHUB_REPO = "https://github.com/Xanoutas/AI-Bounty-Solutions.git"
-KEYWORDS = ["python", "automation", "web3", "solidity", "ocean", "ai agent", 
-    "scraping", "bot", "crypto", "smart contract", "api", "data",
-    "mechanical", "electrical", "engineering", "docker","python", "automation", "web3", "solidity", "gho", "base", "ethereum","gho", "base", "ethereum", "ai agents", "react", "smart contracts", "typescript","electrical","mechanical","industrial","automation","PLC"]
+KEYWORDS = ["python", "automation", "web3", "solidity", "gho", "base", "ethereum","gho", "base", "ethereum", "ai agents", "react", "smart contracts", "typescript","electrical","mechanical","industrial","automation","PLC"]
 LAST_HEARTBEAT = 0
 LAST_KEYWORD_UPDATE = ""
-payload="Ancalagon"
 
-def send_to_discord(text):
-    """Απλή και σίγουρη αποστολή μέσω Curl"""
-    payload = json.dumps({"content": f"🚀 {text}"})
-    # Η εντολή που επιβεβαιώσαμε ότι δουλεύει
-    os.system(f"curl -s -X POST -H 'Content-Type: application/json' -d '{payload}' {DISCORD_URL} > /dev/null")    
-    print("🚀 Curl command executed", flush=True)
+def send_to_discord(payload):
+    """Αποστολή μέσω System Curl για μέγιστη αξιοπιστία"""
+    json_payload = json.dumps(payload)
+    # Χρήση single quotes για το shell command
+    command = f"curl -s -X POST -H 'Content-Type: application/json' -d '{json_payload}' {DISCORD_URL} > /dev/null"
+    os.system(command)
 
 def get_financial_status():
     # 1. Έλεγχος Data Farming (SQLite)
@@ -64,7 +59,7 @@ def send_dashboard():
 
 def check_all_platforms():
     """Ενοποιημένο check για όλες τις πλατφόρμες με 'ανοιχτό' φίλτρο"""
-    print(f"[{datetime.now()}] --- New Scan Started ---", flush=True)    
+    
     # 1. BOUNTYCASTER
    # try:
     #    r = requests.get("https://api.bountycaster.xyz/all-open-bounties", timeout=20)
@@ -77,42 +72,18 @@ def check_all_platforms():
 
     # 2. OCEAN PROTOCOL (GitHub Issues)
     try:
-        import requests
         r = requests.get("https://api.github.com/repos/oceanprotocol/ocean/issues?labels=bounty", timeout=20)
         if r.status_code == 200:
-            found_count = len(r.json())
-            print(f"📡 Ocean: Found {found_count} potential bounties", flush=True)
-            for b in r.json():
-                title = b['title']
-                link = b['html_url']
-                has_key = any(k.lower() in title.lower() for k in KEYWORDS)
-                
-                # Αυτό θα το βλέπεις ΜΟΝΟ στο log
-                if has_key:
-                    print(f"   ⭐ MATCH: {title}", flush=True)
-                    send_to_discord(f"⭐ **[Ocean Match]** {title}\n{link}")
-                else:
-                    # Προαιρετικά: Καταγραφή trending χωρίς αποστολή στο Discord για οικονομία
-                    print(f"   👁️ Trending: {title[:40]}...", flush=True)
-            for issue in r.json()[:30]:
+            for issue in r.json()[:5]:
                 process_and_notify("Ocean", issue['title'], issue['html_url'])
     except Exception as e: print(f"Ocean Error: {e}")
 
-   
-# 3. DEWORK (API Endpoint - Simulation)
+    # 3. DEWORK (API Endpoint - Simulation)
     try:
         # Εδώ χρησιμοποιούμε το endpoint που βρήκαμε ότι δουλεύει στον EPYC
         r = requests.get("https://api.dework.xyz/v1/bounties/trending", timeout=20)
         if r.status_code == 200:
-            data = r.json()[:30]
-            print(f"📡 Dework: Scanning {len(data)} trending items", flush=True)
-            for b in data:
-                title = b['title']
-                has_key = any(k.lower() in title.lower() for k in KEYWORDS)
-                if has_key:
-                    print(f"   ⭐ MATCH: {title}", flush=True)
-                    send_to_discord(f"⭐ **[Dework Match]** {title}\nhttps://app.dework.xyz/bounty/{b['id']}")
-            for d in r.json()[:30]:
+            for d in r.json()[:5]:
                 process_and_notify("Dework", d['title'], f"https://app.dework.xyz/bounty/{d['id']}")
     except: pass
 
@@ -158,7 +129,6 @@ def update_keywords_daily():
 def notify_discord(title, status, url="https://github.com/Xanoutas", is_heartbeat=False):
     color = 3447003 if is_heartbeat else 3066993
     try: requests.post(DISCORD_URL, json={"embeds": [{"title": title, "description": status, "url": url, "color": color}]}, timeout=10)
-   # send_to_discord(json={"embeds": [{"title": title, "description": status, "url": url, "color": color}]}, timeout=10)
     except: pass
 
 def check_ocean_protocol():
@@ -298,12 +268,5 @@ if __name__ == "__main__":
         check_ocean_protocol()
         check_ocean_market()
         check_all_platforms()
-        send_to_discord(payload)
-        wait = random.randint(900, 1100)
-        # Υπολογισμός ώρας αφύπνισης για το log
-        wake_up = datetime.now().hour, datetime.now().minute + (wait // 60)
-        
-        print(f"😴 Cycle complete. Sleeping for {wait}s...", flush=True)
-        print(f"⏰ Next scan at approximately {wake_up[0]}:{wake_up[1]}", flush=True)
-        
-        time.sleep(wait)
+        wait_time = 900 + random.randint(1, 180) # 15-18 λεπτά
+        time.sleep(wait_time)
